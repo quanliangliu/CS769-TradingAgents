@@ -83,8 +83,8 @@ def run_evaluation(
         try:
             cfg = (config or DEFAULT_CONFIG).copy()
             # Fast eval defaults (you can override from CLI)
-            cfg["deep_think_llm"] = cfg.get("deep_think_llm", "gpt-4o-mini")
-            cfg["quick_think_llm"] = cfg.get("quick_think_llm", "gpt-4o-mini")
+            cfg["deep_think_llm"] = cfg.get("deep_think_llm", "gpt-5-nano")
+            cfg["quick_think_llm"] = cfg.get("quick_think_llm", "gpt-5-nano")
             cfg["max_debate_rounds"] = cfg.get("max_debate_rounds", 1)
             cfg["max_risk_discuss_rounds"] = cfg.get("max_risk_discuss_rounds", 1)
             # Deterministic-ish decoding for reproducibility
@@ -154,7 +154,7 @@ def run_evaluation(
 
 def main():
     parser = argparse.ArgumentParser(description="Run TradingAgents evaluation with baseline comparisons")
-    parser.add_argument("ticker", type=str, help="Stock ticker symbol (e.g., AAPL)")
+    parser.add_argument("--ticker", type=str, help="Stock ticker symbol (e.g., AAPL)")
     parser.add_argument("--start-date", type=str, required=True, help="Start date (YYYY-MM-DD)")
     parser.add_argument("--end-date", type=str, required=True, help="End date (YYYY-MM-DD)")
     parser.add_argument("--capital", type=float, default=100000, help="Initial capital (default: 100000)")
@@ -169,8 +169,8 @@ def main():
     if is_debugging():
         config = DEFAULT_CONFIG.copy()
         config.update({
-            "deep_think_llm": "gpt-4o-mini",
-            "quick_think_llm": "gpt-4o-mini",
+            "deep_think_llm": "gpt-5-nano",
+            "quick_think_llm": "gpt-5-nano",
             "max_debate_rounds": 1,
             "max_risk_discuss_rounds": 1,
             "llm_params": {"temperature": 0, "top_p": 1.0, "seed": 42},
@@ -178,9 +178,9 @@ def main():
         run_evaluation(
             ticker="AAPL",
             start_date="2024-01-01",
-            end_date="2024-03-30",
+            end_date="2024-01-04",
             initial_capital=1000,
-            include_tradingagents=False,
+            include_tradingagents=True,
             output_dir="./evaluation/results",
             config=config
         )

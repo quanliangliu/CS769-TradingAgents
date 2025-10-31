@@ -50,6 +50,7 @@ class TradingAgentsBacktester:
                 print(f"Decision: {decision}")
                 signal = self._parse_decision(decision)
                 decisions.append({"date": date_str, "decision": decision, "signal": signal, "price": price})
+
             except Exception as e:
                 print(f"Error: {e}")
                 signal = 0
