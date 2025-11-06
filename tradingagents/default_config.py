@@ -1,4 +1,12 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# Look for .env in the project root (parent of tradingagents directory)
+project_root = Path(__file__).parent.parent
+dotenv_path = project_root / ".env"
+load_dotenv(dotenv_path=dotenv_path)
 
 DEFAULT_CONFIG = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
@@ -13,6 +21,7 @@ DEFAULT_CONFIG = {
     "deep_think_llm": "o4-mini",
     "quick_think_llm": "gpt-4o-mini",
     "backend_url": "https://api.openai.com/v1",
+    "openai_api_key": os.getenv("OPENAI_API_KEY"),  # Load from .env file
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,

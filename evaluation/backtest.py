@@ -1,8 +1,16 @@
 """
 Backtesting engine for TradingAgents and baseline strategies.
+
+Both TradingAgents and rule-based strategies use identical return calculation logic:
+    1. Generate signals/actions: 1 (BUY), 0 (HOLD), -1 (SELL)
+    2. Convert actions to positions: 1 (long), 0 (flat)
+    3. Calculate returns: strategy_return = position.shift(1) * market_return
+
+This ensures apples-to-apples comparison across all strategies.
 """
 
 import pandas as pd
+import numpy as np
 from typing import Dict, List
 from pathlib import Path
 import json
@@ -14,36 +22,37 @@ STD_FIELDS = {"Open", "High", "Low", "Close", "Adj Close", "Volume"}
 class TradingAgentsBacktester:
     """Backtest engine for TradingAgents framework."""
 
-    def __init__(self, trading_agents_graph, initial_capital=100000):
+    def __init__(self, trading_agents_graph, initial_capital=100000, output_dir=None):
         self.graph = trading_agents_graph
         self.initial_capital = float(initial_capital)
         self.name = "TradingAgents"
+        self.output_dir = output_dir
 
     def backtest(self, ticker: str, start_date: str, end_date: str, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Backtest TradingAgents using the same return calculation logic as rule-based strategies.
+        
+        Process:
+        1. Collect signals (actions: 1=BUY, 0=HOLD, -1=SELL) for all dates
+        2. Convert actions to positions (0=flat, 1=long) using same logic as baselines
+        3. Calculate returns as: strategy_return = position.shift(1) * market_return
+        """
         # Restrict to window
         df = data.loc[start_date:end_date].copy()
-        portfolio = pd.DataFrame(index=df.index)
-        portfolio["close"] = df["Close"]
-        if "Volume" in df.columns:
-            portfolio["Volume"] = df["Volume"]
-
-        portfolio["signal"] = 0
-        portfolio["position"] = 0.0
-        portfolio["cash"] = self.initial_capital
-        portfolio["shares"] = 0.0
-        portfolio["portfolio_value"] = self.initial_capital
-
+        
         decisions: List[Dict] = []
+        signals = pd.Series(0, index=df.index, dtype=float)
 
         print(f"\nRunning TradingAgents backtest on {ticker} from {start_date} to {end_date}")
         print(f"Total trading days: {len(df)}")
         print("-" * 80)
 
+        # Step 1: Collect all signals/decisions
         for i, (date, row) in enumerate(df.iterrows()):
             date_str = date.strftime("%Y-%m-%d")
             price = float(row["Close"])
 
-            # Get decision
+            # Get decision from TradingAgents graph
             try:
                 print(f"\n[{i+1}/{len(df)}] {date_str} ... ", end="")
                 final_state, decision = self.graph.propagate(ticker, date_str)
@@ -56,50 +65,59 @@ class TradingAgentsBacktester:
                 signal = 0
                 decisions.append({"date": date_str, "decision": "ERROR", "signal": 0, "price": price, "error": str(e)})
 
-            # Previous day state
-            if i > 0:
-                prev_cash = float(portfolio["cash"].iloc[i - 1])
-                prev_shares = float(portfolio["shares"].iloc[i - 1])
-                prev_pos = float(portfolio["position"].iloc[i - 1])
-            else:
-                prev_cash = self.initial_capital
-                prev_shares = 0.0
-                prev_pos = 0.0
+            signals.loc[date] = signal
 
-            cash, shares, position = prev_cash, prev_shares, prev_pos
-
-            # Execute: BUY opens/keeps long with all cash; SELL closes to cash; HOLD keeps.
-            if signal == 1 and prev_pos <= 0:
-                # Go long full notional
-                shares = cash / price if price > 0 else 0.0
-                cash = 0.0
-                position = 1.0
-            elif signal == -1 and prev_pos > 0:
-                # Exit long to cash (no shorting here; paper's figs show short arrows,
-                # but transactions table is still long/flat in our public code)
-                cash = shares * price
-                shares = 0.0
-                position = 0.0
-            else:
-                # Hold current stance
-                position = prev_pos
-
-            portval = cash + shares * price
-
-            portfolio.loc[date, "signal"] = signal
-            portfolio.loc[date, "position"] = position
-            portfolio.loc[date, "cash"] = cash
-            portfolio.loc[date, "shares"] = shares
-            portfolio.loc[date, "portfolio_value"] = portval
-
-        # Returns
-        portfolio["market_return"] = portfolio["close"].pct_change().fillna(0.0)
-        portfolio["portfolio_return"] = portfolio["portfolio_value"].pct_change().fillna(0.0)
-        portfolio["strategy_return"] = portfolio["portfolio_return"]
-        portfolio["cumulative_return"] = (1.0 + portfolio["strategy_return"]).cumprod()
+        # Step 2: Convert actions to positions (same logic as baseline strategies)
+        position = self._actions_to_position(signals)
+        
+        # Step 3: Calculate returns using standardized logic
+        close = pd.to_numeric(df["Close"], errors="coerce")
+        market_ret = close.pct_change().fillna(0.0)
+        exposure = position.shift(1).fillna(0.0)  # Yesterday's position determines today's exposure
+        strat_ret = (exposure * market_ret).astype(float)
+        
+        cumret = (1.0 + strat_ret).cumprod()
+        portval = self.initial_capital * cumret
+        
+        # Build portfolio DataFrame with same structure as baseline strategies
+        portfolio = pd.DataFrame(index=df.index)
+        portfolio["action"] = signals                       # 1=BUY, 0=HOLD, -1=SELL
+        portfolio["position"] = position                    # 1=long, 0=flat
+        portfolio["close"] = close
+        if "Volume" in df.columns:
+            vol = df["Volume"]
+            if isinstance(vol, pd.DataFrame) and vol.shape[1] == 1:
+                vol = vol.iloc[:, 0]
+            if isinstance(vol, pd.Series):
+                portfolio["Volume"] = vol
+        portfolio["market_return"] = market_ret
+        portfolio["strategy_return"] = strat_ret
+        portfolio["cumulative_return"] = cumret
+        portfolio["portfolio_value"] = portval
+        portfolio["trade_delta"] = portfolio["position"].diff().fillna(0.0)  # +1=buy, -1=sell
 
         self._save_decisions_log(ticker, decisions, start_date, end_date)
         return portfolio
+
+    @staticmethod
+    def _actions_to_position(actions: pd.Series) -> pd.Series:
+        """
+        Convert action series to a long-only position series in {0,1}.
+        Same logic as baseline strategies for consistency.
+        """
+        a = actions.astype(float).fillna(0.0).clip(-1, 1).values
+        pos = np.zeros_like(a, dtype=float)
+        for i in range(len(a)):
+            if i == 0:
+                pos[i] = 1.0 if a[i] > 0 else 0.0
+            else:
+                if a[i] > 0:       # buy → long
+                    pos[i] = 1.0
+                elif a[i] < 0:     # sell → flat
+                    pos[i] = 0.0
+                else:              # hold → keep previous
+                    pos[i] = pos[i-1]
+        return pd.Series(pos, index=actions.index, name="position")
 
     def _parse_decision(self, decision: str) -> int:
         """
@@ -117,12 +135,23 @@ class TradingAgentsBacktester:
         return 0
 
     def _save_decisions_log(self, ticker: str, decisions: List[Dict], start_date: str, end_date: str):
-        out = Path(f"eval_results/{ticker}/TradingAgents_backtest")
+        # Use output_dir if provided, otherwise use default
+        if self.output_dir:
+            out = Path(self.output_dir) / ticker / "TradingAgents"
+        else:
+            out = Path(f"eval_results/{ticker}/TradingAgents")
         out.mkdir(parents=True, exist_ok=True)
         fp = out / f"decisions_{start_date}_to_{end_date}.json"
         with open(fp, "w") as f:
-            json.dump(decisions, f, indent=2)
-        print(f"\nDecisions log saved to: {fp}")
+            json.dump({
+                "strategy": "TradingAgents",
+                "ticker": ticker,
+                "start_date": start_date,
+                "end_date": end_date,
+                "total_days": len(decisions),
+                "decisions": decisions
+            }, f, indent=2)
+        print(f"  ✓ Saved TradingAgents detailed decisions to: {fp}")
 
 
 class BacktestEngine:

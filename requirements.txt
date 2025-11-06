@@ -27,3 +27,4 @@ langchain-google-genai
 matplotlib
 seaborn
 numpy
+python-dotenv
