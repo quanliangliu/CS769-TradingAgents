@@ -83,12 +83,12 @@ def run_evaluation(
         try:
             cfg = (config or DEFAULT_CONFIG).copy()
             # Fast eval defaults (you can override from CLI)
-            cfg["deep_think_llm"] = cfg.get("deep_think_llm", "gpt-5-nano")
-            cfg["quick_think_llm"] = cfg.get("quick_think_llm", "gpt-5-nano")
+            cfg["deep_think_llm"] = cfg.get("deep_think_llm", "o4-mini")
+            cfg["quick_think_llm"] = cfg.get("quick_think_llm", "gpt-4o-mini")
             cfg["max_debate_rounds"] = cfg.get("max_debate_rounds", 1)
             cfg["max_risk_discuss_rounds"] = cfg.get("max_risk_discuss_rounds", 1)
             # Deterministic-ish decoding for reproducibility
-            cfg.setdefault("llm_params", {}).update({"temperature": 0, "top_p": 1.0, "seed": 42})
+            cfg.setdefault("llm_params", {}).update({"temperature": 0.7, "top_p": 1.0, "seed": 42})
 
             print(f"\nInitializing TradingAgents...")
             print(f"  Deep Thinking LLM: {cfg['deep_think_llm']}")
@@ -161,7 +161,7 @@ def main():
     parser.add_argument("--no-tradingagents", action="store_true", help="Skip TradingAgents")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory for results")
     parser.add_argument("--deep-llm", type=str, default="gpt-4o-mini", help="Deep thinking LLM model")
-    parser.add_argument("--quick-llm", type=str, default="gpt-4o-mini", help="Quick thinking LLM model")
+    parser.add_argument("--quick-llm", type=str, default="gpt-5-nano", help="Quick thinking LLM model")
     parser.add_argument("--debate-rounds", type=int, default=1, help="Number of debate rounds (default: 1)")
 
     # Used for debugging
@@ -169,16 +169,16 @@ def main():
     if is_debugging():
         config = DEFAULT_CONFIG.copy()
         config.update({
-            "deep_think_llm": "gpt-5-nano",
-            "quick_think_llm": "gpt-5-nano",
+            "deep_think_llm": "o4-mini",
+            "quick_think_llm": "gpt-4o-mini",
             "max_debate_rounds": 1,
             "max_risk_discuss_rounds": 1,
-            "llm_params": {"temperature": 0, "top_p": 1.0, "seed": 42},
+            "llm_params": {"temperature": 0.7, "top_p": 1.0, "seed": 42},
         })
         run_evaluation(
             ticker="AAPL",
             start_date="2024-01-01",
-            end_date="2024-01-04",
+            end_date="2024-01-10",
             initial_capital=1000,
             include_tradingagents=True,
             output_dir="./evaluation/results",
