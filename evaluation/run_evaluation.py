@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from evaluation.baseline_strategies import get_all_baseline_strategies
 from evaluation.backtest import BacktestEngine, TradingAgentsBacktester, load_stock_data, standardize_single_ticker
 from evaluation.metrics import calculate_all_metrics, create_comparison_table, print_metrics
+from evaluation.visualize import plot_cumulative_returns_from_results
 
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -177,6 +178,32 @@ def run_evaluation(
         metrics = calculate_all_metrics(portfolio)
         all_metrics[name] = metrics
         print_metrics(metrics, name)
+
+    # Generate cumulative returns comparison plot
+    print("\n" + "="*80)
+    print("STEP 5: Generating Comparison Plot")
+    print("="*80)
+    try:
+        comparison_plot_path = str(out / ticker / "strategy_comparison.png")
+        plot_cumulative_returns_from_results(
+            results_dir=str(out / ticker),
+            ticker=ticker,
+            output_path=comparison_plot_path
+        )
+        # Also save as PDF
+        pdf_path = comparison_plot_path.replace('.png', '.pdf')
+        plot_cumulative_returns_from_results(
+            results_dir=str(out / ticker),
+            ticker=ticker,
+            output_path=pdf_path
+        )
+        print(f"\n✓ Comparison plot saved to:")
+        print(f"  - {comparison_plot_path}")
+        print(f"  - {pdf_path}")
+    except Exception as e:
+        print(f"\n✗ Failed to generate comparison plot: {e}")
+        import traceback
+        traceback.print_exc()
 
     print("\n" + "="*80)
     print("EVALUATION COMPLETE")
