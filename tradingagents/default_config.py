@@ -22,6 +22,12 @@ DEFAULT_CONFIG = {
     "quick_think_llm": "gpt-4o-mini",
     "backend_url": "https://api.openai.com/v1",
     "openai_api_key": os.getenv("OPENAI_API_KEY"),  # Load from .env file
+    # Sentiment analysis model (DAPTed Llama 3.1 8B)
+    "use_dapt_sentiment": True,  # Use DAPTed model for sentiment analysis (set False to use OpenAI backup)
+    # Path to DAPT PEFT adapter (dynamically uses current username)
+    "dapt_adapter_path": f"/u/v/d/{os.getenv('USER', 'negi3')}/llama3_8b_dapt_transcripts_lora",
+    # Fallback: OpenAI model if DAPT is unavailable
+    "sentiment_fallback_llm": "o1-mini",  # OpenAI model for fallback
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
