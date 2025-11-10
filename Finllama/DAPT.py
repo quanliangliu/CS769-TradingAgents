@@ -73,9 +73,12 @@ print({
 # %%
 from datasets import load_dataset
 from typing import Optional
+import getpass
 
 # Paths and config
-PARQUET_PATH = "/u/v/d/vdhanuka/defeatbeta-api-main/stock_earning_call_transcripts.parquet"
+# Get current username dynamically
+current_user = getpass.getuser()
+PARQUET_PATH = f"/u/v/d/{current_user}/defeatbeta-api-main/stock_earning_call_transcripts.parquet"
 TEXT_COLUMN: Optional[str] = None  # override to force a column, else auto
 
 raw_ds = load_dataset("parquet", data_files={"train": PARQUET_PATH})["train"]
@@ -183,7 +186,8 @@ print(lm_ds)
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
-OUTPUT_DIR = "/u/v/d/vdhanuka/llama3_8b_dapt_transcripts_lora"
+# Use the current username (already defined above)
+OUTPUT_DIR = f"/u/v/d/{current_user}/llama3_8b_dapt_transcripts_lora"
 LEARNING_RATE = 2e-4
 EPOCHS = 1
 PER_DEVICE_BATCH = 1
