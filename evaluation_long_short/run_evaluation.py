@@ -151,7 +151,8 @@ def run_evaluation(
             print(f"  Debate Rounds: {cfg['max_debate_rounds']}")
 
             graph = TradingAgentsGraph(
-                selected_analysts=["market", "social", "news", "fundamentals"],
+                selected_analysts=["news"],
+                # selected_analysts=["market", "social", "news", "fundamentals"],
                 debug=False,
                 config=cfg
             )
