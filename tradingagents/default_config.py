@@ -25,9 +25,10 @@ DEFAULT_CONFIG = {
     # Sentiment analysis model (DAPTed Llama 3.1 8B)
     "use_dapt_sentiment": True,  # Use DAPTed model for sentiment analysis (set False to use OpenAI backup)
     # Path to DAPT PEFT adapter (dynamically uses current username)
-    "dapt_adapter_path": f"/u/v/d/{os.getenv('USER', 'negi3')}/llama3_8b_dapt_transcripts_lora",
+    "dapt_adapter_path": f"/u/v/d/{os.getenv('USER', 'vdhanuka')}/llama3_8b_dapt_transcripts_lora",
+    
     # Fallback: OpenAI model if DAPT is unavailable
-    "sentiment_fallback_llm": "o1-mini",  # OpenAI model for fallback
+    "sentiment_fallback_llm": "o4-mini",  # OpenAI model for fallback
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
@@ -42,8 +43,8 @@ DEFAULT_CONFIG = {
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
-        # "get_stock_data": "alpha_vantage",  # Override category default
-        "get_news": "alpha_vantage",   
+        "get_stock_data": "openai",  # Override category default
+        "get_news": "openai",   
         "get_global_news" :"openai"           # Override category default
-    },
+    }
 }

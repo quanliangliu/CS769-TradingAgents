@@ -96,7 +96,7 @@ class TradingAgentsGraph:
         # Initialize sentiment analysis LLM (DAPTed Llama 3.1 8B)
         if self.config.get("use_dapt_sentiment", True):
             # Use DAPTed model directly
-            dapt_path = self.config.get("dapt_adapter_path", f"/u/v/d/{os.getenv('USER', 'negi3')}/llama3_8b_dapt_transcripts_lora")
+            dapt_path = self.config.get("dapt_adapter_path", f"/u/v/d/{os.getenv('USER', 'vdhanuka')}/llama3_8b_dapt_transcripts_lora")
             # Convert relative path to absolute if needed
             if not os.path.isabs(dapt_path):
                 dapt_path = os.path.join(self.config["project_dir"], dapt_path)

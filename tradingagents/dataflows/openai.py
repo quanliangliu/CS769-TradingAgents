@@ -35,6 +35,8 @@ def get_stock_news_openai(query, start_date, end_date):
         top_p=1,
         store=True,
     )
+    # print("2:OpenAI call completed")
+    # print(response)
 
     return response.output[1].content[0].text
 
@@ -92,7 +94,8 @@ def get_global_news_openai(curr_date, look_back_days=7, limit=5):
         max_output_tokens=4096,
         store=False,
     )
-
+    # print("1:OpenAI call completed")
+    # print(resp)
     return _extract_text(resp)
 
 

@@ -121,21 +121,27 @@ class DAPTLlamaChatModel(BaseChatModel):
             )
             return prompt
         else:
-            # Fallback to manual formatting
-            formatted_parts = []
+            # Fallback to Llama 3 style manual formatting using header tokens
+            # <|begin_of_text|>
+            # <|start_header_id|>system<|end_header_id|>
+            # {content}<|eot_id|> ...
+            bos = "<|begin_of_text|>"
+            start_header = "<|start_header_id|>"
+            end_header = "<|end_header_id|>"
+            eot = "<|eot_id|>"
+            parts: List[str] = [bos]
             for msg in messages:
                 if isinstance(msg, SystemMessage):
-                    formatted_parts.append(f"<|system|>\n{msg.content}<|end|>\n")
+                    parts.append(f"{start_header}system{end_header}\n{msg.content}{eot}\n")
                 elif isinstance(msg, HumanMessage):
-                    formatted_parts.append(f"<|user|>\n{msg.content}<|end|>\n")
+                    parts.append(f"{start_header}user{end_header}\n{msg.content}{eot}\n")
                 elif isinstance(msg, AIMessage):
-                    formatted_parts.append(f"<|assistant|>\n{msg.content}<|end|>\n")
+                    parts.append(f"{start_header}assistant{end_header}\n{msg.content}{eot}\n")
                 else:
-                    formatted_parts.append(f"{msg.content}\n")
-            
-            # Add assistant prompt
-            formatted_parts.append("<|assistant|>\n")
-            return "".join(formatted_parts)
+                    parts.append(f"{start_header}user{end_header}\n{str(msg.content)}{eot}\n")
+            # Add assistant header to cue generation
+            parts.append(f"{start_header}assistant{end_header}\n")
+            return "".join(parts)
     
     def _generate(
         self,
@@ -220,4 +226,3 @@ class DAPTLlamaWithTools(Runnable):
             messages = [input] if isinstance(input, BaseMessage) else [HumanMessage(content=str(input))]
         
         return self.llm._invoke(messages, **kwargs)
-
