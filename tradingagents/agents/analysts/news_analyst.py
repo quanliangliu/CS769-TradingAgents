@@ -2,9 +2,103 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from datetime import datetime, timedelta
 from tradingagents.agents.utils.agent_utils import get_news, get_global_news
 from tradingagents.dataflows.config import get_config
+from tradingagents.dataflows.news_parsers import parse_stock_news, parse_global_news
+import sys
+from typing import List, Dict, Any, Tuple, Optional
+
+# Add external utilities path for confidence/relevance and LoRA scoring
+CONF_UTILS_PATH = "/u/v/d/vdhanuka/CS769-TradingAgents"
+if CONF_UTILS_PATH not in sys.path:
+    sys.path.append(CONF_UTILS_PATH)
+
+# Import confidence utilities
+try:
+    import confidence as conf  # type: ignore
+    from sentence_transformers import SentenceTransformer  # type: ignore
+except Exception as _e:
+    conf = None  # type: ignore
+    SentenceTransformer = None  # type: ignore
 
 
 def create_news_analyst(llm):
+    # Lazy singletons for model and embedder to avoid reloading every call
+    lora_loaded: Dict[str, Any] = {"tokenizer": None, "model": None, "embedder": None}
+
+    def _ensure_models():
+        if conf is None:
+            raise RuntimeError("confidence.py utilities not available on sys.path.")
+        if lora_loaded["tokenizer"] is None or lora_loaded["model"] is None:
+            adapters_path = "/u/v/d/vdhanuka/defeatbeta-api-main/dapt_sft_adapters_e4_60_20_20"
+            base_model_id = "meta-llama/Llama-3.1-8B"
+            tok, mdl = conf.load_lora_causal_model(base_model_id, adapters_path)
+            lora_loaded["tokenizer"] = tok
+            lora_loaded["model"] = mdl
+        if lora_loaded["embedder"] is None:
+            if SentenceTransformer is None:
+                raise RuntimeError("sentence-transformers not available for relevance computation.")
+            lora_loaded["embedder"] = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+    def _score_items(
+        items: List[Dict[str, Any]],
+        company: str,
+        ticker: str,
+        alpha: float,
+        beta_relevance: float,
+    ) -> Tuple[List[Dict[str, Any]], float, str]:
+        """
+        Score each item with sentiment (LoRA) + confidence and relevance, then compute
+        net sentiment as sum(w_i * S_i) / sum(w_i), where w_i = alpha*confidence + (1-alpha)*relevance.
+        S_i in {-1, 0, 1}.
+        """
+        if not items:
+            return [], 0.0, "Neutral"
+
+        _ensure_models()
+        tokenizer = lora_loaded["tokenizer"]
+        model = lora_loaded["model"]
+        embedder = lora_loaded["embedder"]
+
+        # Build prompts from item text
+        texts: List[str] = []
+        for it in items:
+            # Priority: raw -> headline -> title -> summary
+            text = it.get("raw") or it.get("headline") or it.get("title") or it.get("summary") or ""
+            texts.append(text)
+        prompts = [conf.build_instruction_prompt(t) for t in texts]
+
+        # Sentiment via LoRA scoring (label, confidence)
+        label_texts = ["Positive", "Neutral", "Negative"]
+        sent_conf: List[Tuple[str, float]] = conf.score_labels_with_lora(tokenizer, model, prompts, label_texts)
+
+        scored_items: List[Dict[str, Any]] = []
+        weighted_sum = 0.0
+        weight_total = 0.0
+
+        for it, (lbl, conf_score), txt in zip(items, sent_conf, texts):
+            # lbl already lowercased in confidence.py output path
+            numeric = conf.label_to_numeric(lbl)
+            # Relevance using embedder, company name (if available) and ticker
+            relevance = conf.compute_relevance(embedder, txt if len(txt) <= 160 else (it.get("title") or txt[:160]), company or ticker, ticker, beta=beta_relevance)
+            weight = float(alpha) * float(conf_score) + float(1.0 - alpha) * float(relevance)
+
+            scored = dict(it)
+            scored.update(
+                {
+                    "sentiment_label": lbl,
+                    "sentiment_score": int(numeric),  # -1/0/1
+                    "confidence": float(round(conf_score, 3)),
+                    "relevance": float(round(relevance, 3)),
+                    "weight": float(round(weight, 3)),
+                }
+            )
+            scored_items.append(scored)
+            weighted_sum += weight * numeric
+            weight_total += weight
+
+        net_score = 0.0 if weight_total == 0.0 else float(weighted_sum / weight_total)
+        net_label = "Positive" if net_score > 0.2 else ("Negative" if net_score < -0.2 else "Neutral")
+        return scored_items, net_score, net_label
+
     def news_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
@@ -31,33 +125,87 @@ def create_news_analyst(llm):
             global_news = ""
 
         # Build a data-grounded instruction and feed fetched data to the LLM
+        # Use completion-style prompt that works better with causal LMs (DAPT model)
         system_instruction = (
-            "You are a news researcher tasked with analyzing recent news and trends over the past week. "
-            "Write a comprehensive, data-grounded report relevant for trading and macroeconomics. "
-            "Use the provided fetched news data as primary evidence. "
-            "Do not simply state that trends are mixed. Provide detailed and nuanced insights with implications. "
-            "Append a concise Markdown table at the end summarizing key points.\n\n"
-            f"Context:\n"
-            f"- Current date: {current_date}\n"
-            f"- Company: {ticker}\n\n"
-            f"Fetched company news ({ticker}, {start_date} to {current_date}):\n{company_news}\n\n"
-            f"Fetched global/macro news (last 7 days):\n{global_news}\n"
+            "You are a financial news analyst. Your task is to write a trading-relevant report "
+            "based on the news data provided below.\n\n"
+            "IMPORTANT: Do NOT repeat or echo any part of this prompt. Do NOT ask questions. "
+            "Do NOT output task lists or checklists. Start writing the report directly.\n\n"
+            f"Date: {current_date}\n"
+            f"Company: {ticker}\n\n"
+            f"=== Company News ({ticker}, {start_date} to {current_date}) ===\n{company_news}\n\n"
+            f"=== Global/Macro News (last 7 days) ===\n{global_news}\n\n"
+            "=== END OF NEWS DATA ===\n\n"
+            "Now write a comprehensive analysis report with trading implications. "
+            "End with a Markdown table summarizing key points."
         )
 
+        # Use a single HumanMessage with a starter phrase to guide completion
+        # This helps causal LMs continue naturally instead of echoing
         messages = [
             SystemMessage(content=system_instruction),
-            HumanMessage(content=f"Produce the final report for {ticker} using the fetched data above."),
+            HumanMessage(content=f"Write the {ticker} news analysis report now:"),
         ]
         result = llm.invoke(messages)
 
         report = ""
 
         # Use the generated content as the report
-        report = getattr(result, "content", "") or ""
+        raw_report = getattr(result, "content", "") or ""
+        
+        # Post-process: remove any echoed prompt fragments
+        # Common echo patterns to filter out
+        echo_patterns = [
+            "Write the",
+            "Produce the final report",
+            "news analysis report now",
+            "using the fetched data above",
+        ]
+        report = raw_report
+        for pattern in echo_patterns:
+            if report.strip().startswith(pattern):
+                # Remove the echoed line
+                lines = report.split('\n', 1)
+                report = lines[1] if len(lines) > 1 else ""
+        report = report.strip()
+
+        # Now (after report generation), parse and compute net sentiment (keep logic intact)
+        company_items = parse_stock_news(company_news) if company_news else []
+        global_items = parse_global_news(global_news) if global_news else []
+
+        cfg = get_config()
+        alpha = float(cfg.get("sentiment_conf_alpha", 0.7))
+        beta_relevance = float(cfg.get("relevance_beta", 0.8))
+
+        all_items = []
+        all_items.extend([dict(x, source="company") for x in company_items])
+        all_items.extend([dict(x, source="global") for x in global_items])
+
+        news_items_scored: List[Dict[str, Any]] = []
+        news_net_sentiment_score: float = 0.0
+        news_net_sentiment_label: str = "Neutral"
+
+        if (company_items or global_items) and conf is not None:
+            try:
+                news_items_scored, news_net_sentiment_score, news_net_sentiment_label = _score_items(
+                    all_items,
+                    company=ticker,
+                    ticker=ticker,
+                    alpha=alpha,
+                    beta_relevance=beta_relevance,
+                )
+            except Exception:
+                news_items_scored = []
+                news_net_sentiment_score = 0.0
+                news_net_sentiment_label = "Neutral"
 
         return {
             "messages": [result],
             "news_report": report,
+            # New outputs for FinLLama
+            "news_items_scored": news_items_scored,
+            "news_net_sentiment_score": news_net_sentiment_score,
+            "news_net_sentiment_label": news_net_sentiment_label,
         }
 
     return news_analyst_node
