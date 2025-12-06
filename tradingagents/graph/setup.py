@@ -76,7 +76,8 @@ class GraphSetup:
 
         if "news" in selected_analysts:
             analyst_nodes["news"] = create_news_analyst(
-                self.sentiment_llm
+                # self.sentiment_llm
+                self.quick_thinking_llm
             )
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]

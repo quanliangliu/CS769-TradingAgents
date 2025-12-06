@@ -103,7 +103,7 @@ class TradingAgentsGraph:
             try:
                 self.sentiment_llm = DAPTLlamaChatModel(
                     dapt_adapter_path=dapt_path,
-                    max_new_tokens=512,
+                    max_new_tokens=1024,  # Increased for longer reports
                     temperature=0.7,
                 )
             except Exception as e:
@@ -238,6 +238,10 @@ class TradingAgentsGraph:
             "market_report": final_state["market_report"],
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
+            # Persist FinLLama News fields if present
+            "news_items_scored": final_state.get("news_items_scored", []),
+            "news_net_sentiment_score": final_state.get("news_net_sentiment_score"),
+            "news_net_sentiment_label": final_state.get("news_net_sentiment_label"),
             "fundamentals_report": final_state["fundamentals_report"],
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
