@@ -9,6 +9,6 @@ config["dapt_adapter_path"] = "/u/v/d/vdhanuka/llama3_8b_dapt_transcripts_lora" 
 config["llm_provider"] = "openai"  # provider for the other agents; DAPT is used for News
 config["backend_url"] = "https://api.openai.com/v1"  # unused if DAPT loads fine
 
-graph = TradingAgentsGraph(selected_analysts=["news","fundamentals"], config=config, debug=True)
-_, decision = graph.propagate(company_name="AAPL", trade_date="2024-01-02")
+graph = TradingAgentsGraph(selected_analysts=["news"], config=config, debug=True)
+_, decision = graph.propagate(company_name="AAPL", trade_date="2024-01-04")
 print(decision)

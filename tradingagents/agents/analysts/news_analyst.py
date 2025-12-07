@@ -15,7 +15,9 @@ if CONF_UTILS_PATH not in sys.path:
 try:
     import confidence as conf  # type: ignore
     from sentence_transformers import SentenceTransformer  # type: ignore
+    print("[NEWS_ANALYST] Successfully imported confidence and sentence_transformers")
 except Exception as _e:
+    print(f"[NEWS_ANALYST] Failed to import confidence utilities: {_e}")
     conf = None  # type: ignore
     SentenceTransformer = None  # type: ignore
 
@@ -30,13 +32,17 @@ def create_news_analyst(llm):
         if lora_loaded["tokenizer"] is None or lora_loaded["model"] is None:
             adapters_path = "/u/v/d/vdhanuka/defeatbeta-api-main/dapt_sft_adapters_e4_60_20_20"
             base_model_id = "meta-llama/Llama-3.1-8B"
+            print(f"[NEWS_ANALYST] Loading SFT LoRA model from: {adapters_path}")
             tok, mdl = conf.load_lora_causal_model(base_model_id, adapters_path)
             lora_loaded["tokenizer"] = tok
             lora_loaded["model"] = mdl
+            print("[NEWS_ANALYST] SFT LoRA model loaded successfully")
         if lora_loaded["embedder"] is None:
             if SentenceTransformer is None:
                 raise RuntimeError("sentence-transformers not available for relevance computation.")
+            print("[NEWS_ANALYST] Loading sentence transformer embedder...")
             lora_loaded["embedder"] = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+            print("[NEWS_ANALYST] Embedder loaded successfully")
 
     def _score_items(
         items: List[Dict[str, Any]],
@@ -194,10 +200,18 @@ def create_news_analyst(llm):
                     alpha=alpha,
                     beta_relevance=beta_relevance,
                 )
-            except Exception:
+            except Exception as e:
+                print(f"[NEWS_ANALYST] Sentiment scoring failed: {e}")
+                import traceback
+                traceback.print_exc()
                 news_items_scored = []
                 news_net_sentiment_score = 0.0
                 news_net_sentiment_label = "Neutral"
+        else:
+            if conf is None:
+                print("[NEWS_ANALYST] conf module not loaded - sentiment scoring skipped")
+            if not (company_items or global_items):
+                print("[NEWS_ANALYST] No news items to score")
 
         return {
             "messages": [result],
