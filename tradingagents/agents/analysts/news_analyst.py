@@ -7,7 +7,7 @@ import sys
 from typing import List, Dict, Any, Tuple, Optional
 
 # Add external utilities path for confidence/relevance and LoRA scoring
-CONF_UTILS_PATH = "D:/Quanliang/PhD_courses/CS769-TradingAgents"
+CONF_UTILS_PATH = "Root Path"
 if CONF_UTILS_PATH not in sys.path:
     sys.path.append(CONF_UTILS_PATH)
 
@@ -40,7 +40,7 @@ def create_news_analyst(llm):
             raise RuntimeError("confidence.py utilities not available on sys.path.")
         if lora_loaded["tokenizer"] is None or lora_loaded["model"] is None:
             # Use configured SFT adapter path
-            adapters_path = cfg.get("sft_adapter_path", "D:/Quanliang/PhD_courses/CS769-TradingAgents/dapt_sft_adapters_e4_60_20_20")
+            adapters_path = cfg.get("sft_adapter_path", "PATH")
             base_model_id = "meta-llama/Llama-3.1-8B"
             print(f"[NEWS_ANALYST] Loading SFT LoRA model from: {adapters_path}")
             tok, mdl = conf.load_lora_causal_model(base_model_id, adapters_path)
