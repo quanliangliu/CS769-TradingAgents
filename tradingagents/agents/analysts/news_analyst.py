@@ -7,7 +7,7 @@ import sys
 from typing import List, Dict, Any, Tuple, Optional
 
 # Add external utilities path for confidence/relevance and LoRA scoring
-CONF_UTILS_PATH = "/u/v/d/vdhanuka/CS769-TradingAgents"
+CONF_UTILS_PATH = "D:/Quanliang/PhD_courses/CS769-TradingAgents"
 if CONF_UTILS_PATH not in sys.path:
     sys.path.append(CONF_UTILS_PATH)
 
@@ -27,10 +27,20 @@ def create_news_analyst(llm):
     lora_loaded: Dict[str, Any] = {"tokenizer": None, "model": None, "embedder": None}
 
     def _ensure_models():
+        """Load SFT LoRA model and embedder only if use_sft_sentiment is enabled"""
+        cfg = get_config()
+        use_sft = cfg.get("use_sft_sentiment", False)  # Default to False for original behavior
+        
+        if not use_sft:
+            # Skip loading SFT models if disabled
+            print("[NEWS_ANALYST] SFT sentiment disabled - using fallback sentiment analysis")
+            return False
+            
         if conf is None:
             raise RuntimeError("confidence.py utilities not available on sys.path.")
         if lora_loaded["tokenizer"] is None or lora_loaded["model"] is None:
-            adapters_path = "/u/v/d/vdhanuka/defeatbeta-api-main/dapt_sft_adapters_e4_60_20_20"
+            # Use configured SFT adapter path
+            adapters_path = cfg.get("sft_adapter_path", "D:/Quanliang/PhD_courses/CS769-TradingAgents/dapt_sft_adapters_e4_60_20_20")
             base_model_id = "meta-llama/Llama-3.1-8B"
             print(f"[NEWS_ANALYST] Loading SFT LoRA model from: {adapters_path}")
             tok, mdl = conf.load_lora_causal_model(base_model_id, adapters_path)
@@ -43,6 +53,7 @@ def create_news_analyst(llm):
             print("[NEWS_ANALYST] Loading sentence transformer embedder...")
             lora_loaded["embedder"] = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
             print("[NEWS_ANALYST] Embedder loaded successfully")
+        return True
 
     def _score_items(
         items: List[Dict[str, Any]],
@@ -55,11 +66,19 @@ def create_news_analyst(llm):
         Score each item with sentiment (LoRA) + confidence and relevance, then compute
         net sentiment as sum(w_i * S_i) / sum(w_i), where w_i = alpha*confidence + (1-alpha)*relevance.
         S_i in {-1, 0, 1}.
+        
+        If SFT sentiment is disabled, returns empty scoring.
         """
         if not items:
             return [], 0.0, "Neutral"
 
-        _ensure_models()
+        # Check if SFT models should be loaded
+        sft_enabled = _ensure_models()
+        if not sft_enabled:
+            # SFT disabled - return items without sentiment scoring
+            print("[NEWS_ANALYST] Returning items without SFT sentiment scores (disabled)")
+            return items, 0.0, "Neutral"
+            
         tokenizer = lora_loaded["tokenizer"]
         model = lora_loaded["model"]
         embedder = lora_loaded["embedder"]

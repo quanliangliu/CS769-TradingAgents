@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 config = DEFAULT_CONFIG.copy()
 config["use_dapt_sentiment"] = True
-config["dapt_adapter_path"] = "/u/v/d/vdhanuka/llama3_8b_dapt_transcripts_lora"  # <- set your absolute path
+config["dapt_adapter_path"] = ""  # <- set your absolute path
 config["llm_provider"] = "openai"  # provider for the other agents; DAPT is used for News
 config["backend_url"] = "https://api.openai.com/v1"  # unused if DAPT loads fine
 
