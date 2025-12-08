@@ -226,7 +226,7 @@ def run_evaluation(
             
             if dapt_adapter_path is None:
                 # Default to the path from test_dapt.py
-                dapt_adapter_path = "D:/Quanliang/PhD_courses/CS769-TradingAgents/llama3_8b_dapt_transcripts_lora"
+                dapt_adapter_path = "PATH"
                 print(f"  Using default DAPT adapter path: {dapt_adapter_path}")
             
             cfg_dapt = (config or DEFAULT_CONFIG).copy()
@@ -242,7 +242,7 @@ def run_evaluation(
             cfg_dapt["use_dapt_sentiment"] = True
             cfg_dapt["dapt_adapter_path"] = dapt_adapter_path
             cfg_dapt["use_sft_sentiment"] = True  # Enable SFT for news sentiment
-            cfg_dapt["sft_adapter_path"] = cfg_dapt.get("sft_adapter_path", "D:/Quanliang/PhD_courses/CS769-TradingAgents/dapt_sft_adapters_e4_60_20_20")
+            cfg_dapt["sft_adapter_path"] = cfg_dapt.get("sft_adapter_path", "PATH")
             cfg_dapt["llm_provider"] = cfg_dapt.get("llm_provider", "openai")  # provider for other agents
 
             print(f"\nInitializing TradingAgents (DAPT-Enhanced)...")
@@ -353,7 +353,7 @@ def main():
             initial_capital=1000,
             include_tradingagents=True,
             include_dapt=True,
-            dapt_adapter_path="D:/Quanliang/PhD_courses/CS769-TradingAgents/llama3_8b_dapt_transcripts_lora",
+            dapt_adapter_path="PATH",
             output_dir="./evaluation_long_short/results",
             config=config
         )
