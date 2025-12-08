@@ -25,10 +25,10 @@ DEFAULT_CONFIG = {
     # Sentiment analysis model (DAPTed Llama 3.1 8B)
     "use_dapt_sentiment": True,  # Use DAPTed model for sentiment analysis (set False to use OpenAI backup)
     # Path to DAPT PEFT adapter (dynamically uses current username)
-    "dapt_adapter_path": "D:/Quanliang/PhD_courses/CS769-TradingAgents/llama3_8b_dapt_transcripts_lora",
+    "dapt_adapter_path": "PATH",
     # Path to SFT adapter for news sentiment scoring
     "use_sft_sentiment": True,  # Use SFT fine-tuned model for news sentiment (set False for no fine-tuning)
-    "sft_adapter_path": "D:/Quanliang/PhD_courses/CS769-TradingAgents/dapt_sft_adapters_e4_60_20_20",
+    "sft_adapter_path": "PATH",
     
     # Fallback: OpenAI model if DAPT is unavailable
     "sentiment_fallback_llm": "o4-mini",  # OpenAI model for fallback
